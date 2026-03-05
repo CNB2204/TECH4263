@@ -20,30 +20,52 @@ var equipmentList = new List<Equipment>();
 
 app.UseHttpsRedirection();
 
-app.MapPost("/createequipment", (string name, string category, string status, string location) => {
-    var equipment = new Equipment(name, category, status, location);
+app.MapPost("/equipments", (CreateEquipmentDto dto) => {
+    var equipment = new Equipment(dto.Name, dto.Category, dto.Status, dto.Location);
 
     equipmentList.Add(equipment);
 
-    return Results.Created($"/getequipment/{equipment.Id}", equipment);
+    return Results.Created($"/equipments/{equipment.Id}", new EquipmentResponseDto
+    {
+        Id = equipment.Id,
+        Name = equipment.Name,
+        Category = equipment.Category,
+        Status = equipment.Status,
+        Location = equipment.Location
+    });
 })
    .WithName("CreateEquipment")
    .WithOpenApi();
 
 
-app.MapGet("/getequipments", () => {
+app.MapGet("/equipments", () => {
+    var result = equipmentList.Select(e => new EquipmentResponseDto
+    {
+        Id = e.Id,
+        Name = e.Name,
+        Category = e.Category,
+        Status = e.Status,
+        Location = e.Location
+    }).ToList();
     return Results.Ok(equipmentList);
 })
    .WithName("GetEquipments")
    .WithOpenApi();
 
-app.MapGet("/getequipment/{id}", (int id) => {
+app.MapGet("/equipments/{id:int:min(1)}", (int id) => {
     var equipment = equipmentList.FirstOrDefault(e => e.Id == id);
-    if (equipment == null)
+    if (equipment == null) 
     {
         return Results.NotFound();
     }
-    return Results.Ok(equipment);
+    return Results.Ok(new EquipmentResponseDto
+        {
+        Id = equipment.Id,
+        Name = equipment.Name,
+        Category = equipment.Category,
+        Status = equipment.Status,
+        Location = equipment.Location
+    });
 })
    .WithName("GetEquipmentById")
    .WithOpenApi();
