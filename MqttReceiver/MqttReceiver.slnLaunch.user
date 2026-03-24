@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "MqttReceiver.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "..\\..\\MqttSender\\MqttSender.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
