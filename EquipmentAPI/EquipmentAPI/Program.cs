@@ -1,5 +1,7 @@
 using EquipmentAPI.Models;
 using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using EquipmentAPI.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
@@ -17,31 +20,19 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-var equipmentList = new List<Equipment>();
-
 app.UseHttpsRedirection();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+//var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-app.MapPost("/equipments", async (CreateEquipmentDto dto) => {
-    using var connection = new SqlConnection(connectionString);
-    await connection.OpenAsync();
+app.MapPost("/equipments", async (CreateEquipmentDto dto, AppDbContext context) => {
+    var equipment = new Equipment(dto.Name, dto.Category, dto.Status, dto.Location);
 
-    using var command = new SqlCommand(
-       @"INSERT INTO Equipments (Name, Category, Status, Location)
-          OUTPUT INSERTED.Id
-          VALUES (@Name, @Category, @Status, @Location)", connection);
+    context.Equipments.Add(equipment);
+    await context.SaveChangesAsync();
 
-    command.Parameters.AddWithValue("@Name", dto.Name);
-    command.Parameters.AddWithValue("@Category", dto.Category);
-    command.Parameters.AddWithValue("@Status", dto.Status);
-    command.Parameters.AddWithValue("@Location", dto.Location);
-
-    var newId = (int)(await command.ExecuteScalarAsync())!;
-
-    return Results.Created($"/students/{newId}", new EquipmentResponseDto
+    return Results.Created($"/equipments/{equipment.Id}", new EquipmentResponseDto
     {
-        Id = newId,
+        Id = equipment.Id,
         Name = dto.Name,
         Category = dto.Category,
         Status = dto.Status,
@@ -53,56 +44,36 @@ app.MapPost("/equipments", async (CreateEquipmentDto dto) => {
    .WithOpenApi();
 
 
-app.MapGet("/equipments", async () => {
-    var equipments = new List<EquipmentResponseDto>();
+app.MapGet("/equipments", async (AppDbContext context) => {
+    var equipments = await context.Equipments.ToListAsync();
 
-    using var connection = new SqlConnection(connectionString);
-    await connection.OpenAsync();
-
-    using var command = new SqlCommand("SELECT Id, Name, Category, Status, Location FROM Equipments", connection);
-    using var reader = await command.ExecuteReaderAsync();
-
-    while (await reader.ReadAsync())
+    return Results.Ok(equipments.Select(s => new EquipmentResponseDto
     {
-        equipments.Add(new EquipmentResponseDto
-        {
-            Id = reader.GetInt32(reader.GetOrdinal("Id")),
-            Name = reader.GetString(reader.GetOrdinal("Name")),
-            Category = reader.GetString(reader.GetOrdinal("Category")),
-            Status = reader.GetString(reader.GetOrdinal("Status")),
-            Location = reader.GetString(reader.GetOrdinal("Location"))
-        });
-    }
-
-    return Results.Ok(equipments);
-
+        Id = s.Id,
+        Name = s.Name,
+        Category = s.Category,
+        Status = s.Status,
+        Location = s.Location
+    }));
+    
 })
    .WithName("GetEquipments")
    .WithOpenApi();
 
-app.MapGet("/equipments/{id:int:min(1)}", async (int id) =>
+app.MapGet("/equipments/{id:int:min(1)}", async (int id, AppDbContext context) =>
 {
-    using var connection = new SqlConnection(connectionString);
-    await connection.OpenAsync();
+    var equipment = await context.Equipments.FindAsync(id);
 
-    using var command = new SqlCommand(
-        "SELECT Id, Name, Category, Status, Location  FROM Equipmenmts WHERE Id = @Id", connection);
-
-    // Always use parameters — never concatenate user input into SQL
-    command.Parameters.AddWithValue("@Id", id);
-
-    using var reader = await command.ExecuteReaderAsync();
-
-    if (!await reader.ReadAsync())
+    if (equipment is null)
         return Results.NotFound();
 
     return Results.Ok(new EquipmentResponseDto
     {
-        Id = reader.GetInt32(reader.GetOrdinal("Id")),
-        Name = reader.GetString(reader.GetOrdinal("Name")),
-        Category = reader.GetString(reader.GetOrdinal("Category")), 
-        Status = reader.GetString(reader.GetOrdinal("Status")),
-        Location = reader.GetString(reader.GetOrdinal("Location"))
+        Id = equipment.Id,
+        Name = equipment.Name,
+        Category = equipment.Category,
+        Status = equipment.Status,
+        Location = equipment.Location
     });
 })
    .WithName("GetEquipmentById")
