@@ -2,14 +2,31 @@ using EquipmentAPI.Models;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using EquipmentAPI.Data;
+using Microsoft.AspNetCore.Authentication;
+using EquipmentAPI.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("basic", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "basic",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Enter your username and password"
+    });
+}); builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddAuthentication("BasicAuth")
+    .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("BasicAuth", null);
+
+builder.Services.AddAuthorization();
+
 
 var app = builder.Build();
 
@@ -21,6 +38,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 //var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -75,11 +95,10 @@ app.MapGet("/equipments/{id:int:min(1)}", async (int id, AppDbContext context) =
         Status = equipment.Status,
         Location = equipment.Location
     });
-})
-   .WithName("GetEquipmentById")
-   .WithOpenApi();
+}).WithName("GetEquipmentById").WithOpenApi();
 
 
 app.Run();
+
 
 

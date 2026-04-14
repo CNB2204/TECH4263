@@ -26,31 +26,33 @@ namespace EquipmentDashboard
 
         private async Task LoadEquipmentAsync()
         {
-            SetStatus("Loading...", Color.Gray);
+            try {
+                SetStatus("Loading...", Color.Gray);
 
-            var response = await _httpClient.GetAsync("/equipments");
+                var response = await _httpClient.GetAsync("/equipments");
 
-            if (!response.IsSuccessStatusCode)
-            {
-                SetStatus($"Error: {response.StatusCode}", Color.Red);
-                return;
+                if (!response.IsSuccessStatusCode)
+                {
+                    SetStatus($"Error: {response.StatusCode}", Color.Red);
+                    return;
+                }
+
+                string json = await response.Content.ReadAsStringAsync();
+
+                _equipments = JsonSerializer.Deserialize<List<EquipmentResponseDto>>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                }) ?? new List<EquipmentResponseDto>();
+
+                lstEquipment.Items.Clear();
+                foreach (var equipment in _equipments)
+                {
+                    lstEquipment.Items.Add(equipment.Name);
+
+                    SetStatus(_equipments.Count > 0 ? $"Loaded {_equipments.Count} equipment(s)" : "No equipment found", Color.Gray);
+                }
             }
-
-            string json = await response.Content.ReadAsStringAsync();
-
-            _equipments = JsonSerializer.Deserialize<List<EquipmentResponseDto>>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            }) ?? new List<EquipmentResponseDto>();
-
-            lstEquipment.Items.Clear();
-            foreach (var equipment in _equipments)
-            {
-                lstEquipment.Items.Add(equipment.Name);
-
-                SetStatus(_equipments.Count > 0 ? $"Loaded {_equipments.Count} equipment(s)" : "No equipment found", Color.Gray);
-            }
-            catch(HttpRequestException)
+            catch (HttpRequestException)
             {
                 SetStatus("Cannot connect to EquipmentAPI. Is it running?", Color.Red);
             }
